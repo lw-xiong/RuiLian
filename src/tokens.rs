@@ -1,8 +1,10 @@
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum Token {
     Number(i64),
     Plus,
     Minus,
+    StringLiteral(String),
     Star,
     Slash,
     LeftParen,
@@ -30,6 +32,8 @@ pub enum Token {
     False,
     And,
     Or,
+    Fn,
+    Return,
 }
 
 #[derive(Debug, Clone)]

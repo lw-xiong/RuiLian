@@ -38,13 +38,26 @@ impl Scanner {
     fn scan_token(&mut self) -> Option<Token> {
         let c = self.advance();
         match c {
-            // Single-character tokens
+            '"' => {
+                let mut string = String::new();
+                while self.peek() != '"' && !self.is_at_end() {
+                    if self.peek() == '\n' {
+                        self.line += 1;
+                    }
+                    string.push(self.advance());
+                }
+                if self.is_at_end() {
+                    panic!("Unterminated string at line {}", self.line);
+                }
+                self.advance(); // consume closing "
+                Some(Token::StringLiteral(string))
+            }
+
             '+' => Some(Token::Plus),
             '-' => Some(Token::Minus),
             '*' => Some(Token::Star),
             '/' => {
                 if self.peek() == '/' {
-                    // Skip line comment
                     while self.peek() != '\n' && !self.is_at_end() {
                         self.advance();
                     }
@@ -59,6 +72,7 @@ impl Scanner {
             '}' => Some(Token::RightBrace),
             ';' => Some(Token::Semicolon),
             ',' => Some(Token::Comma),
+
             '!' => {
                 if self.peek() == '=' {
                     self.advance();
@@ -92,14 +106,12 @@ impl Scanner {
                 }
             }
 
-            // Whitespace
             ' ' | '\t' | '\r' => None,
             '\n' => {
                 self.line += 1;
                 None
             }
 
-            // Numbers
             '0'..='9' => {
                 while self.peek().is_ascii_digit() {
                     self.advance();
@@ -108,14 +120,11 @@ impl Scanner {
                 Some(Token::Number(num_str.parse().unwrap()))
             }
 
-            // Identifiers and keywords
             'a'..='z' | 'A'..='Z' | '_' => {
                 while self.peek().is_alphanumeric() || self.peek() == '_' {
                     self.advance();
                 }
                 let text: String = self.source[self.start..self.current].iter().collect();
-
-                // Check for keywords
                 match text.as_str() {
                     "let" => Some(Token::Let),
                     "print" => Some(Token::Print),
@@ -126,6 +135,8 @@ impl Scanner {
                     "false" => Some(Token::False),
                     "and" => Some(Token::And),
                     "or" => Some(Token::Or),
+                    "fn" => Some(Token::Fn),
+                    "return" => Some(Token::Return),
                     _ => Some(Token::Identifier(text)),
                 }
             }
@@ -133,6 +144,7 @@ impl Scanner {
             _ => panic!("Unexpected character: '{}' at line {}", c, self.line),
         }
     }
+
     fn advance(&mut self) -> char {
         let c = self.source[self.current];
         self.current += 1;

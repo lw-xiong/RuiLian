@@ -1,6 +1,7 @@
 #[derive(Debug, Clone)]
 pub enum Expr {
     Number(i64),
+    String(String),
     Variable(String),
     Assign(String, Box<Expr>),
     Binary {
@@ -18,7 +19,7 @@ pub enum Expr {
         right: Box<Expr>,
     },
     Call {
-        callee: String,
+        callee: Box<Expr>,
         arguments: Vec<Expr>,
     },
     Boolean(bool),
@@ -68,8 +69,15 @@ pub enum Stmt {
         condition: Expr,
         body: Box<Stmt>,
     },
+    Function {
+        name: String,
+        params: Vec<String>,
+        body: Vec<Stmt>,
+    },
+    Return {
+        value: Option<Expr>,
+    },
 }
-
 #[derive(Debug, Clone)]
 pub struct Program {
     pub statements: Vec<Stmt>,
