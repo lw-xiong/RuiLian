@@ -24,7 +24,6 @@ impl Parser {
     // === declaration -> function_decl | let_decl | statement ===
     fn declaration(&mut self) -> Option<Stmt> {
         if self.matches(&[Token::Fn]) {
-            // Changed from Token::Fn
             self.function_declaration()
         } else if self.matches(&[Token::Let]) {
             if let Ok(stmt) = self.let_declaration() {
@@ -43,7 +42,6 @@ impl Parser {
         let name = self
             .consume_identifier()
             .expect("Expect function name after 'function'.");
-
         self.consume(Token::LeftParen, "Expect '(' after function name.");
 
         let mut params = Vec::new();
@@ -81,15 +79,16 @@ impl Parser {
         Ok(Stmt::Let { name, initializer })
     }
 
-    // === statement -> return | if | while | block | print | expr_stmt ===
+    // === statement -> return | if | while | for | block | print | expr_stmt ===
     fn statement(&mut self) -> Option<Stmt> {
         if self.matches(&[Token::Return]) {
-            // No change needed; already Token::Return
             self.return_statement()
         } else if self.matches(&[Token::If]) {
             self.if_statement()
         } else if self.matches(&[Token::While]) {
             self.while_statement()
+        } else if self.matches(&[Token::For]) {
+            self.for_statement()
         } else if self.matches(&[Token::LeftBrace]) {
             Some(self.block())
         } else if self.matches(&[Token::Print]) {
@@ -99,7 +98,30 @@ impl Parser {
         }
     }
 
-    // === return_stmt -> "return" expression? ";" ===
+    fn for_statement(&mut self) -> Option<Stmt> {
+        self.consume(Token::LeftParen, "Expect '(' after 'for'.");
+
+        let variable = self
+            .consume_identifier()
+            .expect("Expect variable name in for loop.");
+
+        self.consume(Token::In, "Expect 'in' after variable.");
+
+        let iterable = self.expression();
+
+        self.consume(Token::RightParen, "Expect ')' after iterable.");
+
+        let body = self
+            .statement()
+            .expect("Expect statement for for loop body.");
+
+        Some(Stmt::For {
+            variable,
+            iterable: Box::new(iterable),
+            body: Box::new(body),
+        })
+    }
+
     fn return_statement(&mut self) -> Option<Stmt> {
         let value = if !self.check(&Token::Semicolon) {
             Some(self.expression())
@@ -181,13 +203,23 @@ impl Parser {
 
         if self.matches(&[Token::Equals]) {
             let value = self.assignment();
-            if let Expr::Variable(name) = expr {
-                return Expr::Assign(name, Box::new(value));
-            } else {
-                panic!("Invalid assignment target");
+            match expr {
+                Expr::Variable(name) => Expr::Assign(name, Box::new(value)),
+                Expr::Index { object, index } => Expr::IndexAssign {
+                    object,
+                    index,
+                    value: Box::new(value),
+                },
+                Expr::Dot { object, field } => Expr::DotAssign {
+                    object,
+                    field,
+                    value: Box::new(value),
+                },
+                _ => panic!("Invalid assignment target"),
             }
+        } else {
+            expr
         }
-        expr
     }
 
     fn logical_or(&mut self) -> Expr {
@@ -278,21 +310,8 @@ impl Parser {
     }
 
     fn factor(&mut self) -> Expr {
-        let mut expr = self.unary();
-        while self.matches(&[Token::Star, Token::Slash]) {
-            let operator = match self.previous().token {
-                Token::Star => BinOp::Multiply,
-                Token::Slash => BinOp::Divide,
-                _ => unreachable!(),
-            };
-            let right = self.unary();
-            expr = Expr::Binary {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
-            };
-        }
-        expr
+        let expr = self.unary();
+        self.finish_index(expr)
     }
 
     fn unary(&mut self) -> Expr {
@@ -330,6 +349,14 @@ impl Parser {
             return Expr::String(s);
         }
 
+        if self.matches(&[Token::LeftBrace]) {
+            return self.map_literal();
+        }
+
+        if self.matches(&[Token::LeftBracket]) {
+            return self.array_literal();
+        }
+
         if let Token::Identifier(name) = &self.tokens[self.current].token {
             let name_clone = name.clone();
             self.advance();
@@ -356,6 +383,91 @@ impl Parser {
             "Expected expression, found {:?} at pos {}",
             self.tokens[self.current].token, self.current
         );
+    }
+
+    fn map_literal(&mut self) -> Expr {
+        let mut pairs = Vec::new();
+
+        if !self.check(&Token::RightBrace) {
+            loop {
+                let key = match &self.tokens[self.current].token {
+                    Token::StringLiteral(s) => s.clone(),
+                    Token::Identifier(name) => name.clone(),
+                    _ => panic!("Map key must be string or identifier"),
+                };
+                self.advance();
+
+                self.consume(Token::Colon, "Expect ':' after map key");
+
+                let value = self.expression();
+                pairs.push((key, value));
+
+                if !self.matches(&[Token::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        self.consume(Token::RightBrace, "Expect '}' after map literal");
+        Expr::Map(pairs)
+    }
+
+    fn array_literal(&mut self) -> Expr {
+        let mut elements = Vec::new();
+        if !self.check(&Token::RightBracket) {
+            loop {
+                elements.push(self.expression());
+                if !self.matches(&[Token::Comma]) {
+                    break;
+                }
+            }
+        }
+        self.consume(Token::RightBracket, "Expected ']' after array elements");
+        Expr::Array(elements)
+    }
+
+    fn finish_index(&mut self, mut object: Expr) -> Expr {
+        loop {
+            if self.matches(&[Token::LeftBracket]) {
+                let index = self.expression();
+                self.consume(Token::RightBracket, "Expected ']' after index");
+
+                if self.matches(&[Token::Equals]) {
+                    let value = self.expression();
+                    object = Expr::IndexAssign {
+                        object: Box::new(object),
+                        index: Box::new(index),
+                        value: Box::new(value),
+                    };
+                } else {
+                    object = Expr::Index {
+                        object: Box::new(object),
+                        index: Box::new(index),
+                    };
+                }
+            } else if self.matches(&[Token::Dot]) {
+                let field = self
+                    .consume_identifier()
+                    .expect("Expect field name after '.'");
+
+                if self.matches(&[Token::Equals]) {
+                    let value = self.expression();
+                    object = Expr::DotAssign {
+                        object: Box::new(object),
+                        field,
+                        value: Box::new(value),
+                    };
+                } else {
+                    object = Expr::Dot {
+                        object: Box::new(object),
+                        field,
+                    };
+                }
+            } else {
+                break;
+            }
+        }
+        object
     }
 
     fn arguments(&mut self) -> Vec<Expr> {
@@ -404,18 +516,14 @@ impl Parser {
 
     fn synchronize(&mut self) {
         self.advance();
-
         while !self.is_at_end() {
             if let Token::Semicolon = self.previous().token {
                 return;
             }
-
             match self.tokens[self.current].token {
                 Token::Let | Token::Print | Token::If | Token::While | Token::Fn => return,
-                _ => {
-                    self.advance();
-                }
-            }
+                _ => self.advance(),
+            };
         }
     }
 

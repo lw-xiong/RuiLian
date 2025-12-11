@@ -9,11 +9,15 @@ pub enum Token {
     Slash,
     LeftParen,
     RightParen,
+    LeftBracket,
+    RightBracket,
     EOF,
     Identifier(String),
     Equals,
     Semicolon,
+    Colon,
     Comma,
+    Dot,
     LeftBrace,    // {
     RightBrace,   // }
     Greater,      // >
@@ -23,6 +27,8 @@ pub enum Token {
     EqualEqual,   // ==
     BangEqual,    // !=
     Bang,         // !
+
+    // Keywords
     Let,
     Print,
     If,
@@ -34,6 +40,8 @@ pub enum Token {
     Or,
     Fn,
     Return,
+    For,
+    In,
 }
 
 #[derive(Debug, Clone)]

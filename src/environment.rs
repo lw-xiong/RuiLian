@@ -9,16 +9,37 @@ pub enum Value {
     Number(i64),
     String(String),
     Boolean(bool),
-    Function(Function), // NEW: Function value
+    Function(Function),
+    Array(Vec<Value>),
+    Map(std::collections::HashMap<String, Value>),
 }
 
-// NEW: Function type
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::Number(a), Value::Number(b)) => a == b,
+            (Value::String(a), Value::String(b)) => a == b,
+            (Value::Boolean(a), Value::Boolean(b)) => a == b,
+            (Value::Array(a), Value::Array(b)) => a == b,
+            (Value::Map(a), Value::Map(b)) => a == b,
+            (Value::Function(_), Value::Function(_)) => false, // Functions are not equal
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Function {
     pub name: String,
     pub params: Vec<String>,
     pub body: Vec<Stmt>,
-    pub closure: Rc<RefCell<Environment>>, // Closure: environment where function was defined
+    pub closure: Rc<RefCell<Environment>>,
+}
+
+impl PartialEq for Function {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +88,13 @@ impl Environment {
             enclosing.borrow_mut().assign(name, value)
         } else {
             false
+        }
+    }
+
+    pub fn get_array_length(&self, name: &str) -> Option<usize> {
+        match self.get(name) {
+            Some(Value::Array(arr)) => Some(arr.len()),
+            _ => None,
         }
     }
 }

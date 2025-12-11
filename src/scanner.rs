@@ -53,6 +53,9 @@ impl Scanner {
                 Some(Token::StringLiteral(string))
             }
 
+            '[' => Some(Token::LeftBracket),
+            ']' => Some(Token::RightBracket),
+
             '+' => Some(Token::Plus),
             '-' => Some(Token::Minus),
             '*' => Some(Token::Star),
@@ -70,8 +73,10 @@ impl Scanner {
             ')' => Some(Token::RightParen),
             '{' => Some(Token::LeftBrace),
             '}' => Some(Token::RightBrace),
+            ':' => Some(Token::Colon),
             ';' => Some(Token::Semicolon),
             ',' => Some(Token::Comma),
+            '.' => Some(Token::Dot),
 
             '!' => {
                 if self.peek() == '=' {
@@ -137,6 +142,8 @@ impl Scanner {
                     "or" => Some(Token::Or),
                     "fn" => Some(Token::Fn),
                     "return" => Some(Token::Return),
+                    "for" => Some(Token::For),
+                    "in" => Some(Token::In),
                     _ => Some(Token::Identifier(text)),
                 }
             }

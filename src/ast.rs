@@ -1,6 +1,7 @@
 #[derive(Debug, Clone)]
 pub enum Expr {
     Number(i64),
+    Map(Vec<(String, Expr)>),
     String(String),
     Variable(String),
     Assign(String, Box<Expr>),
@@ -23,6 +24,27 @@ pub enum Expr {
         arguments: Vec<Expr>,
     },
     Boolean(bool),
+    Array(Vec<Expr>),
+    Index {
+        object: Box<Expr>,
+        index: Box<Expr>,
+    },
+    IndexAssign {
+        object: Box<Expr>,
+        index: Box<Expr>,
+        value: Box<Expr>,
+    },
+    Dot {
+        // Dot notation: obj.field
+        object: Box<Expr>,
+        field: String,
+    },
+    DotAssign {
+        // Dot assignment: obj.field = value
+        object: Box<Expr>,
+        field: String,
+        value: Box<Expr>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +91,12 @@ pub enum Stmt {
         condition: Expr,
         body: Box<Stmt>,
     },
+    For {
+        // <-- ADD THIS!
+        variable: String,
+        iterable: Box<Expr>,
+        body: Box<Stmt>,
+    },
     Function {
         name: String,
         params: Vec<String>,
@@ -78,7 +106,6 @@ pub enum Stmt {
         value: Option<Expr>,
     },
 }
-#[derive(Debug, Clone)]
 pub struct Program {
     pub statements: Vec<Stmt>,
 }
